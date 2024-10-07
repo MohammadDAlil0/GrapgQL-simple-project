@@ -6,12 +6,15 @@ export interface IUser extends Document {
     email: string;
     password: string;
     isValidPassword: (password: string) => Promise<boolean>;
+    token: string;
+    role: "Admin" | "User";
 }
 
 const UserSchema: Schema = new Schema({
     username: {type: String, required: true, unique: true},
     email: {type: String, required: true},
-    password: { type: String, required: true}
+    password: { type: String, required: true},
+    role: {type: String, enum: ["Admin", "User"], default: 'User', required: true}
 })
 
 UserSchema.pre<IUser>('save', async function (next) {

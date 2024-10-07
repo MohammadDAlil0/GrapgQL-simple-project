@@ -1,11 +1,21 @@
-import {User} from '../model/user';
+import {User, IUser} from '../model/user';
+import jwt from 'jsonwebtoken';
+
 
 interface Args {
     id: string;
     username: string;
     email: string;
     password: string;
+    role: 'User' | 'Adimn';
 }
+
+const signUser = (user: IUser) => {
+    return jwt.sign({id: user._id}, process.env.JWT_SECRET!, {
+        expiresIn: process.env.JWT_EXPIRES_IN
+    });
+}
+
 
 export const UsersResolver = {
     Query : {
@@ -32,6 +42,10 @@ export const UsersResolver = {
             } catch (error) {
                 throw error;
             }
+        },
+
+        getMe: async (_ : any, args : Args, context: any) => {
+            return context.user;
         }
     },
 
@@ -43,8 +57,10 @@ export const UsersResolver = {
                 const newUser = await User.create({
                     username: args.username,
                     email: args.email,
-                    password: args.password
+                    password: args.password,
+                    role: args.role
                 })
+                newUser.token = signUser(newUser);
                 return newUser;
             } catch (error) {
                 throw error;
@@ -57,17 +73,21 @@ export const UsersResolver = {
                 if (!user) throw new Error('User not found');
                 const isValid = await user.isValidPassword(args.password);
                 if (!isValid) throw new Error('Invalid password');
+                user.token = signUser(user); 
                 return user;
             } catch (error) {
                 throw error;
             }
         },
 
-        updateUser: async (_ : any, args : Args) => {
+        updateUser: async (_ : any, args : Args, context: any) => {
             try {
+                if (context.user.role !== 'Admin') {
+                    throw new Error('Only admins can update users!');
+                }
                 const id = args.id;
                 if (!id) throw new Error('No id provided');
-                const user = await User.findById(args.id);
+                const user = await User.findById(id);
                 if (!user) throw new Error('User not found');
                 const updateUser = await User.findByIdAndUpdate(id, {...args}, {new: true, runValidators: true});
                 return updateUser;
@@ -76,8 +96,11 @@ export const UsersResolver = {
             }
         },
 
-        deleteUser: async (_ : any, args : Args) => {
+        deleteUser: async (_ : any, args : Args, context: any) => {
             try {
+                if (context.user.role !== 'Admin') {
+                    throw new Error('Only admins can update users!');
+                }
                 const id = args.id;
                 if (!id) throw new Error('No id provided');
                 const user = await User.findById(args.id);
